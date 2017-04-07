@@ -1,0 +1,292 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>World Map & Airport</title>
+    <script src="https://d3js.org/d3.v3.js"></script>
+    <script src="topojson.min.js"></script>
+    <style>
+        .country {
+          stroke: #4d6872;
+        }
+        #information{
+          position: absolute;
+           left: 1000px; 
+           top:  10px; 
+          background: #fff;
+          width: 200px;
+          height: 300px;
+          padding: 0px 10px;
+          border-radius: 5px;
+          box-shadow: 5px 5px 10px rgba(0,0,0,0.3);
+          border-style:solid;
+        }
+        
+        .background {
+          fill: none;
+          pointer-events: all;
+        }
+/*
+        .route {
+        //still sloving problem
+          fill: none;
+          stroke-width: 1;
+          stroke: gray;
+          stroke-dasharray:5, 5;
+        }
+*/
+
+/*  
+        #tooltip.hidden{
+          display: none;
+        }
+*/
+    </style>
+</head>
+<body>
+    <div id="information" class="hidden">
+      <p><strong id="detail_head"></strong></p>
+      <p id="detail"></p>
+    </div>
+   
+    <script>
+        var width = 1200,
+            height = 600,
+            centered;
+        
+        // geo: projection、center([,])、scale;
+        var projection = d3.geo.equirectangular()
+            .scale(150);
+//            .translate([width / 2, height / 2]);
+        
+        var amount_scale = [] //set for in color scale
+        
+        
+        var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+        
+        
+        //create clicked map
+        svg.append("rect")
+            .attr("class", "background")
+            .attr("width", width)
+            .attr("height", height)
+            .on("click", clicked);
+        
+        
+        
+        
+        
+        //load data
+        d3.json("world_map_50m.json", function(error,topoData) {
+            if (error) throw error;
+            
+            //bind csv with topojson
+            combine(topoData);
+            
+            bind_50map(topoData);
+            render_50map();
+            
+            bind_airport(topoData);
+            render_airport();
+            
+//            airline();//solving problem
+        });     
+
+        
+        function airline(){
+            //still sloving problem
+            var projection2 = d3.geo.equirectangular().scale(150);
+            var path2 = d3.geo.path().projection(projection2);
+            var line = graticule.lines([137157,77893],[89236,121338]);
+            
+            d3.select('svg').append("path")
+                 .datum({type: "LineString", coordinates:[line]})
+                 .attr("class", "route")
+                 .attr("d", path2).attr('fill','red');
+            
+            
+        }
+       
+        
+        
+        
+
+
+        function combine(topoData){
+            //combine csv data with topoData!
+             var topo = topojson.feature(topoData, topoData.objects["ne_50m_airports"]);
+             d3.csv('final_table.csv',function(dataSet){
+                for(var i=0;i<topo.features.length;i++){
+                    topo.features[i].properties.amount = 0;
+                    //set the flight amount = 0
+                }
+                for(var m=0;m<dataSet.length;m++){
+                    for(var i=0;i<topo.features.length;i++){
+                        if(topo.features[i].properties.iata_code===dataSet[m].dep_place){
+                            topo.features[i].properties.amount=topo.features[i].properties.amount+1;
+                        }
+                        if(topo.features[i].properties.iata_code===dataSet[m].arr_place){
+                            topo.features[i].properties.amount=topo.features[i].properties.amount+1;
+                        }
+                    }
+                
+                }
+                 
+                for(var i=0;i<topo.features.length;i++){
+                    amount_scale.push(topo.features[i].properties.amount);
+                }
+                 
+                
+            });
+            
+            return topoData;
+            
+            
+            
+        }    
+        
+        function bind_50map(topoData){
+            var topo = topojson.feature(topoData, topoData.objects["ne_50m_admin_0_countries"]);
+            var path = d3.geo.path().projection(projection);
+            //bind geo features
+            var selection = d3.select("svg").selectAll("path").data(topo.features);  
+            selection.enter().append("path").attr("id", "country");
+            selection.exit().remove();
+            selection.classed("country", true).attr("d", path);
+        }
+        
+        
+        function bind_airport(topoData){
+            //combine airport
+            var path = d3.geo.path().projection(projection).pointRadius(1);//change the radius 
+            var topo = topojson.feature(topoData, topoData.objects["ne_50m_airports"]);
+            
+//            console.log(topo.features[0]);//testing
+           
+            
+            
+            var selection = d3.select("svg").selectAll("path.airport").data(topo.features);
+            selection.enter().append("path").attr('class','airport');
+            selection.exit().remove();
+            selection.attr("d", path);
+        }
+        
+        
+        function formatNumber(str,glue){
+            // add ',' to the string number for each three digits 
+            if(isNaN(str)){
+                return NaN;
+            }
+            
+            var digits = str.toString().split('.');
+            var integerDigits = digits[0].split('');
+            var threeDigits =[];
+            while(integerDigits.length>3){
+                threeDigits.unshift(integerDigits.splice(integerDigits.length-3,3).join(''));
+            }
+            threeDigits.unshift(integerDigits.join(''));
+            digits[0] = threeDigits.join(glue);
+            return digits.join('.');
+            
+        }
+
+        
+        function render_50map(){
+            var mapScale = d3.scale.category20c();
+            var temp_color;
+            d3.selectAll("#country")
+            .attr({
+                fill: function(d,i){
+                    return mapScale(i);
+                }
+            }).on('mouseover',function(d){
+                temp_color = d3.select(this).attr('fill');  
+                d3.select(this).attr('fill','lightgreen');
+            }).on('mouseout',function(d){
+                 d3.select(this).attr('fill',temp_color);
+            }).on('click',function(d){
+                var info = d3.select("#information");
+                var pop = formatNumber(d.properties.pop_est,',');
+                
+                
+                info.select("#detail_head").text('Country : '+d.properties.admin+'('+d.properties.postal+')');
+                info.select("#detail").html(
+                    'Continent : '+d.properties.continent+
+                    '<br><br>'+
+                    'Subregion : '+d.properties.subregion+
+                    '<br><br>'+
+                    'Population : '+pop+
+                    '<br><br>'+
+                    'Economy : '+d.properties.economy
+                );  
+                clicked(d);  
+            }); 
+   
+        }
+        
+        function render_airport(){
+            var temp_color;
+            
+            var xScale = d3.scale.ordinal().domain([d3.max(amount_scale),d3.min(amount_scale)]).range(['yellow','red']);
+            d3.selectAll("path.airport")
+            .attr({
+                fill:function(d,i){
+                    console.log(d.properties.amount);//why undefine???
+                    return xScale(+amount_scale[i]);
+                }
+            }).on('mouseover',function(d){
+                temp_color = d3.select(this).attr('fill');  
+                d3.select(this).attr('fill','blue');
+            }).on('mouseout',function(d){
+                 d3.select(this).attr('fill',temp_color);
+//                 d3.select("#tooltip").classed("hidden", true);
+            }).on('click',function(d){
+                //show information
+                var info = d3.select("#information");
+                
+                info.select("#detail_head").text('Airport : '+d.properties.name+'('+d.properties.iata_code+')');
+                info.select("#detail").html(
+                    'Flight amount : '+d.properties.amount+
+                    '<br><br>'+
+                    '<a href='+d.properties.wikipedia+'>more detail</a>'
+                );
+//                tooltop.classed("hidden", false);
+                clicked(d);
+            }); 
+
+        }
+        
+        
+        function clicked(d) {
+          var x, y, k;
+          var path = d3.geo.path().projection(projection);
+          
+          if (d && centered !== d) {
+            var centroid = path.centroid(d);
+            x = centroid[0];
+            y = centroid[1];
+            k = 4;
+            centered = d;
+          } else {
+            x = width / 2;
+            y = height / 2;
+            k = 1;
+            centered = null;
+          }
+
+          d3.selectAll('path')
+              .transition()
+              .duration(750)
+              .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + k + ")translate(" + -x + "," + -y + ")")
+              .style("stroke-width", 1.5 / k + "px");
+        }
+
+        
+        
+
+    </script>
+
+</body>
+</html>
