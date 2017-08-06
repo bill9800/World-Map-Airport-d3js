@@ -7,5 +7,8 @@ This repository includes the materials reference and demo for visualizing the wo
 ## Preparation
 1. Get world map information from [**Natural Earth**](http://www.naturalearthdata.com/). 
 2. Get airport location information also from Natural Earth.
-3. Because the map file is not available to be used by D3js, transfer the file to topojason on [**Mapshaper**](mapshaper.org).
+3. Because the map file is not available to be used by D3js, we need to transfer the file to topojason by [**Mapshaper**](https://github.com/mbloch/mapshaper).
 4. Use web crawler to get more information about the airport. I wrote a python web crawler to complete this task.
+5. Setup the frame of the web.
+6. Combine all materials by javascripts and D3js.
+7. Use D3js to visualize the data.
